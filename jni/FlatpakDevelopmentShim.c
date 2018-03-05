@@ -43,7 +43,7 @@ static void host_command_exited_cb(GDBusConnection *conn, const gchar *sender_na
         guint exited_subscription = (*env)->GetIntField(env, process, subscription_fid);
         if (exited_subscription != 0) {
             g_dbus_connection_signal_unsubscribe(conn, exited_subscription);
-            (*env)->SetIntField(env, process, subscription_fid, exited_subscription);
+            (*env)->SetIntField(env, process, subscription_fid, 0);
         }
 
         (*env)->DeleteGlobalRef(env, process);

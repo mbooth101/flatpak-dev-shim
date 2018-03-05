@@ -153,7 +153,15 @@ final class ProcessImpl extends Process {
             }
             return new ProcessImpl(argv, argv.length, envv, envv == null ? 0 : envv.length, toCString(dir), fds);
         } finally {
-
+            if (f0 != null) {
+                f0.close();
+            }
+            if (f1 != null) {
+                f1.close();
+            }
+            if (f2 != null) {
+                f2.close();
+            }
         }
     }
 
