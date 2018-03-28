@@ -11,7 +11,7 @@ In order to enable the shim, Java programs must be started with the following pa
 
 And the Flatpak sandbox in which the Java program is running must be granted the following permissions:
 
-    --allow=devel --talk-name=org.freedesktop.Flatpak
+    --filesystem=host --allow=devel --talk-name=org.freedesktop.Flatpak
 
 Use `java.lang.ProcessBuilder` in the usual way.
 
