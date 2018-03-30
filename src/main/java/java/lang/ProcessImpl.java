@@ -9,9 +9,12 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.lang.ProcessBuilder.Redirect;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 
 import jdk.internal.misc.JavaIOFileDescriptorAccess;
 import jdk.internal.misc.SharedSecrets;
@@ -33,16 +36,15 @@ final class ProcessImpl extends Process {
     private final OutputStream stdin;
     private final InputStream stdout;
     private final InputStream stderr;
+    private final ProcessHandleImpl processHandle;
 
     private int exitcode;
     private boolean hasExited;
 
-    // Used by native code to keep track of subscription to the signal that will
-    // notify us that the process has exited.
-    private int subscription;
-
-    private ProcessImpl(byte[][] argv, int argc, byte[][] envv, int envc, byte[] dir, int[] fds) throws IOException {
-        pid = execHostCommand(argv, argc, envv, envc, dir, fds);
+    private ProcessImpl(byte[] argv, int argc, byte[] envv, int envc, int[] fds, boolean redirectErrStream)
+            throws IOException {
+        pid = forkAndExecHostCommand(argv, argc, envv, envc, fds, redirectErrStream);
+        processHandle = ProcessHandleImpl.getInternal(pid);
 
         // Initialise streams for the process's standard file descriptors
         if (fds[0] == -1) {
@@ -60,8 +62,17 @@ final class ProcessImpl extends Process {
         } else {
             stderr = new ProcessPipeInputStream(fds[2]);
         }
+        ProcessHandleImpl.completion(pid, true).handle((exitcode, throwable) -> {
+            synchronized (this) {
+                if (exitcode == null) {
+                    this.exitcode = -1;
+                } else {
+                    this.exitcode = exitcode.intValue();
+                }
+                this.hasExited = true;
+                this.notifyAll();
+            }
 
-        onExit().handle((process, throwable) -> {
             if (stdout instanceof ProcessPipeInputStream) {
                 ((ProcessPipeInputStream) stdout).processExited();
             }
@@ -75,43 +86,35 @@ final class ProcessImpl extends Process {
         });
     }
 
-    private native int execHostCommand(byte[][] argv, int argc, byte[][] envv, int envc, byte[] dir, int[] fds)
-            throws IOException;
-
-    /**
-     * Called by the native code when the process has exited.
-     */
-    private synchronized void hostCommandExited(int code) {
-        hasExited = true;
-        exitcode = code;
-        notifyAll();
-    }
+    private native int forkAndExecHostCommand(byte[] argv, int argc, byte[] envv, int envc, int[] fds,
+            boolean redirectErrStream) throws IOException;
 
     /**
      * For use only by {@link ProcessBuilder#start()}.
      */
     static Process start(String[] cmdarray, Map<String, String> environment, String dir,
-            ProcessBuilder.Redirect[] redirects, boolean redirectErrorStream) throws IOException {
-
-        byte[][] argv = new byte[cmdarray.length][];
-        for (int i = 0; i < cmdarray.length; i++) {
-            argv[i] = toCString(cmdarray[i]);
-        }
-
-        byte[][] envv = null;
-        if (environment != null && !environment.isEmpty()) {
-            envv = new byte[environment.size() * 2][];
-            int i = 0;
-            for (Map.Entry<String, String> entry : environment.entrySet()) {
-                envv[i++] = toCString(entry.getKey());
-                envv[i++] = toCString(entry.getValue());
-            }
-        }
+            ProcessBuilder.Redirect[] redirects, boolean redirectErrStream) throws IOException {
 
         // Try to honour ProcessBuilder contract by using user.dir if none is specified
-        if (dir == null || dir.isEmpty()) {
-            dir = System.getProperty("user.dir");
+        String workdir = System.getProperty("user.dir");
+        if (dir != null && !dir.isEmpty()) {
+            workdir = dir;
         }
+
+        List<String> argarray = new ArrayList<>();
+        argarray.add("hostcommandrunner");
+        argarray.add(workdir);
+        argarray.addAll(Arrays.asList(cmdarray));
+        byte[] argv = toCStrings(argarray.toArray(new String[0]));
+
+        List<String> envarray = new ArrayList<>();
+        if (environment != null) {
+            for (Map.Entry<String, String> entry : environment.entrySet()) {
+                envarray.add(entry.getKey());
+                envarray.add(entry.getValue());
+            }
+        }
+        byte[] envv = toCStrings(envarray.toArray(new String[0]));
 
         FileInputStream f0 = null;
         FileOutputStream f1 = null;
@@ -122,9 +125,9 @@ final class ProcessImpl extends Process {
             int[] fds = { -1, -1, -1 };
             if (redirects != null) {
                 // stdin
-                if (redirects[0] == Redirect.PIPE) {
+                if (redirects[0] == ProcessBuilder.Redirect.PIPE) {
                     fds[0] = -1;
-                } else if (redirects[0] == Redirect.INHERIT) {
+                } else if (redirects[0] == ProcessBuilder.Redirect.INHERIT) {
                     fds[0] = 0;
                 } else {
                     f0 = new FileInputStream(redirects[0].file());
@@ -132,9 +135,9 @@ final class ProcessImpl extends Process {
                 }
 
                 // stdout
-                if (redirects[1] == Redirect.PIPE) {
+                if (redirects[1] == ProcessBuilder.Redirect.PIPE) {
                     fds[1] = -1;
-                } else if (redirects[1] == Redirect.INHERIT) {
+                } else if (redirects[1] == ProcessBuilder.Redirect.INHERIT) {
                     fds[1] = 1;
                 } else {
                     f1 = new FileOutputStream(redirects[1].file(), redirects[1].append());
@@ -142,16 +145,17 @@ final class ProcessImpl extends Process {
                 }
 
                 // stderr
-                if (redirects[2] == Redirect.PIPE) {
+                if (redirects[2] == ProcessBuilder.Redirect.PIPE) {
                     fds[2] = -1;
-                } else if (redirects[2] == Redirect.INHERIT) {
+                } else if (redirects[2] == ProcessBuilder.Redirect.INHERIT) {
                     fds[2] = 2;
                 } else {
                     f2 = new FileOutputStream(redirects[2].file(), redirects[2].append());
                     fds[2] = fdAccess.get(f2.getFD());
                 }
             }
-            return new ProcessImpl(argv, argv.length, envv, envv == null ? 0 : envv.length, toCString(dir), fds);
+
+            return new ProcessImpl(argv, argarray.size(), envv, envarray.size(), fds, redirectErrStream);
         } finally {
             if (f0 != null) {
                 f0.close();
@@ -166,8 +170,28 @@ final class ProcessImpl extends Process {
     }
 
     @Override
-    public long pid() {
-        return pid;
+    public CompletableFuture<Process> onExit() {
+        return ProcessHandleImpl.completion(pid, false).handleAsync((unusedExitStatus, unusedThrowable) -> {
+            boolean interrupted = false;
+            while (true) {
+                // Ensure that the concurrent task setting the exit status has completed
+                try {
+                    waitFor();
+                    break;
+                } catch (InterruptedException ie) {
+                    interrupted = true;
+                }
+            }
+            if (interrupted) {
+                Thread.currentThread().interrupt();
+            }
+            return this;
+        });
+    }
+
+    @Override
+    public ProcessHandle toHandle() {
+        return processHandle;
     }
 
     @Override
@@ -187,12 +211,22 @@ final class ProcessImpl extends Process {
     }
 
     private void destroy(boolean force) {
-        // TODO send term/kill signal to process depending on force:
-        // <method name="HostCommandSignal">
-        // <arg type='u' name='pid' direction='in'/>
-        // <arg type='u' name='signal' direction='in'/>
-        // <arg type='b' name='to_process_group' direction='in'/>
-        // </method>
+        synchronized (this) {
+            if (!hasExited)
+                processHandle.destroyProcess(force);
+        }
+        try {
+            stdin.close();
+        } catch (IOException ignored) {
+        }
+        try {
+            stdout.close();
+        } catch (IOException ignored) {
+        }
+        try {
+            stderr.close();
+        } catch (IOException ignored) {
+        }
     }
 
     @Override
@@ -239,16 +273,23 @@ final class ProcessImpl extends Process {
     }
 
     /**
-     * Convert a java string into a C-style null-terminated byte array.
+     * Convert java strings into a single contiguous block of C-style null
+     * terminated byte arrays. This makes arrays of arrays easier to deal with on
+     * the native side.
      */
-    private static byte[] toCString(String s) {
-        if (s == null) {
-            return null;
+    private static byte[] toCStrings(String... values) {
+        int size = 0;
+        for (String value : values) {
+            size += value.length() + 1;
         }
-        byte[] bytes = s.getBytes();
-        byte[] result = new byte[bytes.length + 1];
-        System.arraycopy(bytes, 0, result, 0, bytes.length);
-        result[bytes.length] = (byte) 0;
+        byte[] result = new byte[size];
+        int pos = 0;
+        for (String value : values) {
+            byte[] bytes = value.getBytes();
+            System.arraycopy(bytes, 0, result, pos, bytes.length);
+            pos += bytes.length;
+            result[pos++] = (byte) 0;
+        }
         return result;
     }
 
@@ -276,7 +317,7 @@ final class ProcessImpl extends Process {
         private final Object closeLock = new Object();
 
         ProcessPipeInputStream(int fd) {
-            super(new FileInputStream(newFileDescriptor(fd)));
+            super(new PipeInputStream(newFileDescriptor(fd)));
         }
 
         private static byte[] drainInputStream(InputStream in) throws IOException {
@@ -338,8 +379,6 @@ final class ProcessImpl extends Process {
                 try {
                     this.out.close();
                 } catch (IOException ignored) {
-                    // We know of no reason to get an IOException, but if
-                    // we do, there's nothing else to do but carry on.
                 }
                 this.out = ProcessBuilder.NullOutputStream.INSTANCE;
             }

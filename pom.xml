@@ -85,6 +85,10 @@
                   <file>${project.build.directory}/libflatpakdevshim.so</file>
                   <type>so</type>
                 </artifact>
+                <artifact>
+                  <file>${project.build.directory}/hostcommandrunner</file>
+                  <type>exe</type>
+                </artifact>
               </artifacts>
             </configuration>
           </execution>

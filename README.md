@@ -4,7 +4,7 @@ A shim that allows Java programs to breakout of a Flatpak sandbox and spawn proc
 
 ## Usage
 
-In order to enable the shim, Java programs must be started with the following parameters:
+In order to enable the shim, Java 9 is required and programs must be started with the following parameters:
 
     --patch-module java.base=/path/to/flatpak-dev-shim.jar
     -Dsun.boot.library.path=/usr/lib/jvm/java-9/lib:/path/to/flatpak-dev-shim/libdir
@@ -26,7 +26,6 @@ To use system-specific compiler and linker flags when building the native parts,
 ## Limitations
 
 * Because the spawned process runs outside the sandbox, it is not visible to Java (it is outside of the sandbox's cgroup). This means we can't enumerate the process's children and traverse the process hierarchy, etc.
-* Currently works only with SWT applications because it relies on SWT to work the message pump that triggers the DBus callbacks.
 
 ## To Do
 
