@@ -8,7 +8,7 @@
 
 #include <jni.h>
 
-#include "java_lang_ProcessImpl.h"
+#include "java_lang_FlatpakProcessImpl.h"
 
 typedef struct ProcessData {
     int in[2];
@@ -69,44 +69,46 @@ static void start_process(ProcessData *p) {
         }
     }
 
-    execvp(p->argv[0], p->argv);
+    execvpe(p->argv[0], (char * const *) p->argv, (char * const *) p->envv);
 }
 
 /**
- * Convert a contiguous block of bytes that contains null-terminated strings into a vector of such strings. Allocates
- * enough space for count + 1 pointers so that the final entry can be null. The memory pointed to by vector must be
- * free(3)'d by the caller.
+ * Convert a contiguous block of bytes that contains null-terminated strings into a vector of such strings. Returned
+ * is a pointer to a null-terminated vector of null-terminated strings. This memory must be free'd by the caller.
  */
-static void initialise_vector(const char **vector, const char *bytes, int count) {
+static const char **initialise_vector(const char *bytes, int count) {
+    /*
+     * The returned vector must have a null final entry, so we allocate one more than count and the contract of
+     * calloc(3) ensures that it will be initialised to zero
+     */
+    const char **v = calloc(count + 1, sizeof(char*));
     const char *p = bytes;
     for (int i = 0; i < count; i++) {
         /*
          * Increment pointer p until we encounter a null that marks the end of a string, this makes p always point to
          * the start of a string the next time through the loop
          */
-        vector[i] = p;
+        v[i] = p;
         while (*(p++))
             ;
     }
-    vector[count] = NULL; /* Must have a null final entry */
+    return v;
 }
 
-JNIEXPORT jint JNICALL Java_java_lang_ProcessImpl_forkAndExecHostCommand(JNIEnv *env, jobject process, jbyteArray argv,
-        jint argc, jbyteArray envv, jint envc, jintArray fds, jboolean redirectErrStream) {
+JNIEXPORT jint JNICALL Java_java_lang_FlatpakProcessImpl_forkAndExecHostCommand(JNIEnv *env, jobject process,
+        jbyteArray argv, jint argc, jbyteArray envv, jint envc, jintArray fds, jboolean redirectErrStream) {
 
     ProcessData *p = calloc(1, sizeof(ProcessData));
 
     /* Initialise the command and argument list, this is never null */
     const char *argBytes = (const char*) (*env)->GetByteArrayElements(env, argv, NULL);
-    p->argv = calloc(argc + 1, sizeof(char*));
+    p->argv = initialise_vector(argBytes, argc);
     p->argc = argc;
-    initialise_vector(p->argv, argBytes, argc);
 
     /* Initialise the environment list of key/values, this is never null, but might be empty */
     const char *envBytes = (const char*) (*env)->GetByteArrayElements(env, envv, NULL);
-    p->envv = calloc(envc + 1, sizeof(char*));
+    p->envv = initialise_vector(envBytes, envc);
     p->envc = envc;
-    initialise_vector(p->envv, envBytes, envc);
 
     /* Set up file descriptors and/or pipes to child process */
     jint *std_fds = (*env)->GetIntArrayElements(env, fds, NULL);

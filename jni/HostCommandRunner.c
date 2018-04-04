@@ -53,10 +53,14 @@ static void command_exited_cb(GDBusConnection *conn, const gchar *sender_name, c
  */
 static int exec_host_command(const char *workdir, const char *argv[], int argc, const char *envv[], int envc) {
 
-    CommandData *command_data = calloc(1, sizeof(CommandData));
-
     GError *error = NULL;
     GDBusConnection *conn = g_bus_get_sync(G_BUS_TYPE_SESSION, NULL, &error);
+    if (conn == NULL) {
+        g_printerr("Error: %s\n", error->message);
+        return 1;
+    }
+
+    CommandData *command_data = calloc(1, sizeof(CommandData));
 
     /* Ensure the args list has a null final entry */
     const char *args[argc + 1];

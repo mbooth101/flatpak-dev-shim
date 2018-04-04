@@ -11,7 +11,6 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -24,7 +23,7 @@ import jdk.internal.misc.SharedSecrets;
  * start processes in the host environment. It does this by communicating with
  * the "Development" interface of the org.freedesktop.Flatpak DBus API.
  */
-final class ProcessImpl extends Process {
+final class FlatpakProcessImpl extends Process {
 
     static {
         System.loadLibrary("flatpakdevshim");
@@ -41,7 +40,7 @@ final class ProcessImpl extends Process {
     private int exitcode;
     private boolean hasExited;
 
-    private ProcessImpl(byte[] argv, int argc, byte[] envv, int envc, int[] fds, boolean redirectErrStream)
+    private FlatpakProcessImpl(byte[] argv, int argc, byte[] envv, int envc, int[] fds, boolean redirectErrStream)
             throws IOException {
         pid = forkAndExecHostCommand(argv, argc, envv, envc, fds, redirectErrStream);
         processHandle = ProcessHandleImpl.getInternal(pid);
@@ -101,17 +100,23 @@ final class ProcessImpl extends Process {
             workdir = dir;
         }
 
+        // Generate argument block, which must be prefixed with the name of the helper
+        // executable that will launch the process on the process host and working
+        // directory that should be used on the sandbox host
         List<String> argarray = new ArrayList<>();
         argarray.add("hostcommandrunner");
         argarray.add(workdir);
         argarray.addAll(Arrays.asList(cmdarray));
         byte[] argv = toCStrings(argarray.toArray(new String[0]));
 
+        // Generate the environment block, to which we must add the $DISPLAY variable
+        // because it must be defined in the child process environment in order for
+        // auto-launching DBus to work
         List<String> envarray = new ArrayList<>();
+        envarray.add("DISPLAY=" + System.getenv("DISPLAY"));
         if (environment != null) {
             for (Map.Entry<String, String> entry : environment.entrySet()) {
-                envarray.add(entry.getKey());
-                envarray.add(entry.getValue());
+                envarray.add(entry.getKey() + "=" + entry.getValue());
             }
         }
         byte[] envv = toCStrings(envarray.toArray(new String[0]));
@@ -155,7 +160,7 @@ final class ProcessImpl extends Process {
                 }
             }
 
-            return new ProcessImpl(argv, argarray.size(), envv, envarray.size(), fds, redirectErrStream);
+            return new FlatpakProcessImpl(argv, argarray.size(), envv, envarray.size(), fds, redirectErrStream);
         } finally {
             if (f0 != null) {
                 f0.close();
