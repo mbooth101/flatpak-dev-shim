@@ -1,14 +1,15 @@
 package java.lang;
 
-import java.io.FlatpakFile;
 import java.io.IOException;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.Map;
 
 /**
  * A shim that sits between {@link java.lang.ProcessBuilder} and
- * {@link java.lang.Process} that will start processes on the sandbox host if
- * the client tries to execute programs that do not exist inside the Flatpak
- * sandbox.
+ * {@link java.lang.Process} that will start processes on the sandbox host using
+ * the Flatpak shim if the client tries to execute programs that reside on the
+ * sandbox host mount point.
  */
 class ProcessImplFactory {
 
@@ -18,14 +19,15 @@ class ProcessImplFactory {
     static Process start(String[] cmdarray, Map<String, String> environment, String dir,
             ProcessBuilder.Redirect[] redirects, boolean redirectErrStream) throws IOException {
 
-        // If the desired executable program exists only on the sandbox host, then
-        // execute it on the sandbox host instead, otherwise execute it normally
-        FlatpakFile exe = new FlatpakFile(cmdarray[0]);
-        if (exe.existsSandboxHost() && !exe.existsSandbox()) {
-            System.out.println("Running on sandbox host: " + exe);
+        // If the desired executable program lives in /run/host (where the sandbox host
+        // is mounted) then execute it on the sandbox host, otherwise execute normally
+        Path exe = Paths.get(cmdarray[0]);
+        if (exe.startsWith(Paths.get("/run/host"))) {
+            cmdarray[0] = Paths.get("/").resolve(exe.subpath(2, exe.getNameCount())).toString();
+            System.out.println("Running on sandbox host: " + cmdarray[0]);
             return FlatpakProcessImpl.start(cmdarray, environment, dir, redirects, redirectErrStream);
         } else {
-            System.out.println("Running in sandbox: " + exe);
+            System.out.println("Running in sandbox: " + cmdarray[0]);
             return ProcessImpl.start(cmdarray, environment, dir, redirects, redirectErrStream);
         }
     }
