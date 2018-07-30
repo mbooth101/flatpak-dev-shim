@@ -55,7 +55,7 @@ static int exec_host_command(const char *workdir, const char *argv[], int argc, 
 
     GError *error = NULL;
     GDBusConnection *conn = g_bus_get_sync(G_BUS_TYPE_SESSION, NULL, &error);
-    if (conn == NULL) {
+    if (error != NULL) {
         g_printerr("Error: %s\n", error->message);
         return 1;
     }
@@ -97,6 +97,14 @@ static int exec_host_command(const char *workdir, const char *argv[], int argc, 
     GVariant* reply = g_dbus_connection_call_with_unix_fd_list_sync(conn, "org.freedesktop.Flatpak",
             "/org/freedesktop/Flatpak/Development", "org.freedesktop.Flatpak.Development", "HostCommand", params,
             G_VARIANT_TYPE("(u)"), G_DBUS_CALL_FLAGS_NONE, -1, fd_list, NULL, NULL, &error);
+
+    if (error != NULL) {
+        g_printerr("Error: %s\n", error->message);
+        g_dbus_connection_signal_unsubscribe(conn, sub_id);
+        g_object_unref(conn);
+        free(command_data);
+        return 1;
+    }
 
     /* The pid of the process running on the sandbox host is returned in the reply */
     g_variant_get(reply, "(u)", &command_data->pid);
