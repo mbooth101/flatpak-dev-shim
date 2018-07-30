@@ -18,7 +18,7 @@
 					<folderInfo id="cdt.managedbuild.toolchain.gnu.base.196164438.545014798" name="/jni/" resourcePath="">
 						<toolChain id="cdt.managedbuild.toolchain.gnu.base.103417899" name="Linux GCC" superClass="cdt.managedbuild.toolchain.gnu.base">
 							<targetPlatform archList="all" binaryParser="org.eclipse.cdt.core.GNU_ELF" id="cdt.managedbuild.target.gnu.platform.base.1638308347" name="Debug Platform" osList="linux,hpux,aix,qnx" superClass="cdt.managedbuild.target.gnu.platform.base"/>
-							<builder buildPath="${workspace_loc:/flatpak-dev-shim}/jni" id="cdt.managedbuild.target.gnu.builder.base.738868886" incrementalBuildTarget="rebuild" keepEnvironmentInBuildfile="false" managedBuildOn="false" name="Gnu Make Builder" superClass="cdt.managedbuild.target.gnu.builder.base">
+							<builder buildPath="${workspace_loc:/flatpak-dev-shim}/jni" enableAutoBuild="true" id="cdt.managedbuild.target.gnu.builder.base.738868886" incrementalBuildTarget="rebuild" keepEnvironmentInBuildfile="false" managedBuildOn="false" name="Gnu Make Builder" superClass="cdt.managedbuild.target.gnu.builder.base">
 								<outputEntries>
 									<entry flags="VALUE_WORKSPACE_PATH" kind="outputPath" name="target"/>
 								</outputEntries>

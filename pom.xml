@@ -12,8 +12,8 @@
   <name>Flatpak Development Shim</name>
 
   <properties>
-    <maven.version>3.5.0</maven.version>
-    <java.version>9</java.version>
+    <maven.version>3.5.2</maven.version>
+    <java.version>10</java.version>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
   </properties>
 
@@ -22,7 +22,7 @@
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-compiler-plugin</artifactId>
-        <version>3.7.0</version>
+        <version>3.8.0</version>
         <configuration>
           <source>${java.version}</source>
           <target>${java.version}</target>
