@@ -22,12 +22,24 @@ class ProcessImplFactory {
         // If the desired executable program lives in /run/host (where the sandbox host
         // is mounted) then execute it on the sandbox host, otherwise execute normally
         Path exe = Paths.get(cmdarray[0]);
-        if (exe.startsWith(Paths.get("/run/host"))) {
-            cmdarray[0] = Paths.get("/").resolve(exe.subpath(2, exe.getNameCount())).toString();
-            System.out.println("Running on sandbox host: " + cmdarray[0]);
+        if (exe.startsWith(Paths.get("/var/run/host"))) {
+            cmdarray[0] = Paths.get("/").resolve(exe.subpath(3, exe.getNameCount())).toString();
+            if (Boolean.getBoolean("flatpak.hostcommandrunner.debug")) {
+                StringBuilder sb = new StringBuilder("Running on sandbox host: ");
+                for (String arg : cmdarray) {
+                    sb.append(" " + arg);
+                }
+                System.out.println(sb.toString());
+            }
             return FlatpakProcessImpl.start(cmdarray, environment, dir, redirects, redirectErrStream);
         } else {
-            System.out.println("Running in sandbox: " + cmdarray[0]);
+            if (Boolean.getBoolean("flatpak.hostcommandrunner.debug")) {
+                StringBuilder sb = new StringBuilder("Running in sandbox: ");
+                for (String arg : cmdarray) {
+                    sb.append(" " + arg);
+                }
+                System.out.println(sb.toString());
+            }
             return ProcessImpl.start(cmdarray, environment, dir, redirects, redirectErrStream);
         }
     }
