@@ -29,7 +29,7 @@ class ProcessImplFactory {
                 for (String arg : cmdarray) {
                     sb.append(" " + arg);
                 }
-                System.out.println(sb.toString());
+                System.err.println(sb.toString());
             }
             return FlatpakProcessImpl.start(cmdarray, environment, dir, redirects, redirectErrStream);
         } else {
@@ -38,7 +38,7 @@ class ProcessImplFactory {
                 for (String arg : cmdarray) {
                     sb.append(" " + arg);
                 }
-                System.out.println(sb.toString());
+                System.err.println(sb.toString());
             }
             return ProcessImpl.start(cmdarray, environment, dir, redirects, redirectErrStream);
         }

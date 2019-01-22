@@ -51,7 +51,7 @@ static void command_exited_cb(GDBusConnection *conn, const gchar *sender_name, c
  * Starts the process on the sandbox host and blocks until the process has exited. The return value is the exit code
  * of that process.
  */
-static int exec_host_command(const char *workdir, const char *argv[], int argc, const char *envv[], int envc) {
+static int exec_host_command(const char *workdir, const char *argv[], const char *envp[]) {
 
     GError *error = NULL;
     GDBusConnection *conn = g_bus_get_sync(G_BUS_TYPE_SESSION, NULL, &error);
@@ -61,13 +61,6 @@ static int exec_host_command(const char *workdir, const char *argv[], int argc, 
     }
 
     CommandData *command_data = calloc(1, sizeof(CommandData));
-
-    /* Ensure the args list has a null final entry */
-    const char *args[argc + 1];
-    for (int i = 0; i < argc; i++) {
-        args[i] = argv[i];
-    }
-    args[argc] = NULL;
 
     /* Build file descriptor map for the sandbox host process */
     GUnixFDList* fd_list = g_unix_fd_list_new();
@@ -81,8 +74,12 @@ static int exec_host_command(const char *workdir, const char *argv[], int argc, 
     /* Build the environment variable map */
     GVariantBuilder env_builder;
     g_variant_builder_init(&env_builder, G_VARIANT_TYPE("a{ss}"));
-    for (int i = 0; i < envc; i += 2) {
-        g_variant_builder_add(&env_builder, "{ss}", envv[i], envv[i + 1]);
+    while (*envp) {
+        char *key, *value;
+        key = value = strdup(*envp++);
+        strsep(&value, "=");
+        g_variant_builder_add(&env_builder, "{ss}", key, value);
+        free(key);
     }
 
     /* Connect to the HostCommandExited dbus signal first to avoid races */
@@ -92,7 +89,7 @@ static int exec_host_command(const char *workdir, const char *argv[], int argc, 
     command_data->subscription = sub_id;
 
     /* Call the HostCommand dbus method to start a process on the sandbox host */
-    GVariant* params = g_variant_new("(^ay^aay@a{uh}@a{ss}u)", workdir, args, g_variant_builder_end(&fds_builder),
+    GVariant* params = g_variant_new("(^ay^aay@a{uh}@a{ss}u)", workdir, argv, g_variant_builder_end(&fds_builder),
             g_variant_builder_end(&env_builder), 0);
     GVariant* reply = g_dbus_connection_call_with_unix_fd_list_sync(conn, "org.freedesktop.Flatpak",
             "/org/freedesktop/Flatpak/Development", "org.freedesktop.Flatpak.Development", "HostCommand", params,
@@ -124,6 +121,7 @@ static int exec_host_command(const char *workdir, const char *argv[], int argc, 
     return status;
 }
 
-int main(int argc, const char *argv[]) {
-    return exec_host_command(argv[1], argv + 2, argc - 2, NULL, 0);
+int main(int argc, const char *argv[], const char *envp[]) {
+    /* First two args are process name (ignored) and working dir (passed separately.) */
+    return exec_host_command(argv[1], argv + 2, envp);
 }

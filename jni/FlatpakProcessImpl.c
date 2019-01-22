@@ -16,9 +16,7 @@ typedef struct ProcessData {
     int err[2];
     int fds[3];
     const char **argv;
-    int argc;
     const char **envv;
-    int envc;
     unsigned char redirectErrStream;
 } ProcessData;
 
@@ -103,12 +101,10 @@ JNIEXPORT jint JNICALL Java_java_lang_FlatpakProcessImpl_forkAndExecHostCommand(
     /* Initialise the command and argument list, this is never null */
     const char *argBytes = (const char*) (*env)->GetByteArrayElements(env, argv, NULL);
     p->argv = initialise_vector(argBytes, argc);
-    p->argc = argc;
 
     /* Initialise the environment list of key/values, this is never null, but might be empty */
     const char *envBytes = (const char*) (*env)->GetByteArrayElements(env, envv, NULL);
     p->envv = initialise_vector(envBytes, envc);
-    p->envc = envc;
 
     /* Set up file descriptors and/or pipes to child process */
     jint *std_fds = (*env)->GetIntArrayElements(env, fds, NULL);
