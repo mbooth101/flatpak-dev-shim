@@ -110,10 +110,13 @@ final class FlatpakProcessImpl extends Process {
         byte[] argv = toCStrings(argarray.toArray(new String[0]));
 
         // Generate the environment block, to which we must add the $DISPLAY variable
-        // because it must be defined in the child process environment in order for
-        // auto-launching DBus to work
+        // and the $DBUS_SESSION_BUS_ADDRESS variable if it exists because it must be
+        // defined in the child process environment in order for auto-launching to work
         List<String> envarray = new ArrayList<>();
         envarray.add("DISPLAY=" + System.getenv("DISPLAY"));
+        if (System.getenv("DBUS_SESSION_BUS_ADDRESS") != null) {
+            envarray.add("DBUS_SESSION_BUS_ADDRESS=" + System.getenv("DBUS_SESSION_BUS_ADDRESS"));
+        }
         if (environment != null) {
             for (Map.Entry<String, String> entry : environment.entrySet()) {
                 envarray.add(entry.getKey() + "=" + entry.getValue());
