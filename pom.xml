@@ -4,7 +4,7 @@
 
   <groupId>uk.co.matbooth.flatpak</groupId>
   <artifactId>flatpak-dev-shim</artifactId>
-  <version>1.0.0</version>
+  <version>1.0.1-SNAPSHOT</version>
 
   <name>Flatpak Development Shim</name>
   <url>https://github.com/mbooth101/flatpak-dev-shim</url>
@@ -26,7 +26,7 @@
     <developerConnection>
       scm:git:git@github.com:mbooth101/flatpak-dev-shim.git
     </developerConnection>
-    <tag>flatpak-dev-shim-1.0.0</tag>
+    <tag>HEAD</tag>
   </scm>
 
   <licenses>
