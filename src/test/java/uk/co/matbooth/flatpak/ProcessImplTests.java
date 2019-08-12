@@ -23,7 +23,8 @@ import org.junit.jupiter.api.TestInstance.Lifecycle;
 @TestInstance(Lifecycle.PER_METHOD)
 public class ProcessImplTests {
 
-    private List<String> lines = new ArrayList<>();
+    private List<String> outLines = new ArrayList<>();
+    private List<String> errLines = new ArrayList<>();
 
     @Test
     public void runInSandbox() throws IOException, InterruptedException {
@@ -40,6 +41,17 @@ public class ProcessImplTests {
     }
 
     @Test
+    public void runOnHostDueToNotFoundInSandbox() throws IOException, InterruptedException {
+        try {
+            readThenWait(false, "no_such_exe");
+            Assertions.fail("An IOException was expected");
+        } catch (IOException e) {
+            System.out.println("Exception: " + e.getMessage());
+            Assertions.assertTrue(e.getMessage().contains("No such file or directory"));
+        }
+    }
+
+    @Test
     public void runOnHostWithoutErrRedirection() throws IOException, InterruptedException {
         int rc = readThenWait(false, "/var/run/host/bin/sh", "-c",
                 "echo 'starting...' && sleep 1 && echo 'oh no' 1>&2 && sleep 1 && echo done && exit 42");
@@ -47,7 +59,10 @@ public class ProcessImplTests {
         List<String> expected = new ArrayList<>();
         expected.add("starting...");
         expected.add("done");
-        Assertions.assertLinesMatch(expected, lines);
+        Assertions.assertLinesMatch(expected, outLines);
+        List<String> expected2 = new ArrayList<>();
+        expected2.add("oh no");
+        Assertions.assertLinesMatch(expected2, errLines);
     }
 
     @Test
@@ -59,20 +74,26 @@ public class ProcessImplTests {
         expected.add("starting...");
         expected.add("oh no");
         expected.add("done");
-        Assertions.assertLinesMatch(expected, lines);
+        Assertions.assertLinesMatch(expected, outLines);
     }
 
     private int readThenWait(boolean redirectErr, String... args) throws IOException, InterruptedException {
         ProcessBuilder pb = new ProcessBuilder(args);
         pb.redirectErrorStream(redirectErr);
         Process p = pb.start();
-        BufferedReader reader = new BufferedReader(new InputStreamReader(p.getInputStream()));
+        BufferedReader outReader = new BufferedReader(new InputStreamReader(p.getInputStream()));
+        BufferedReader errReader = new BufferedReader(new InputStreamReader(p.getErrorStream()));
         String line = null;
-        while ((line = reader.readLine()) != null) {
-            System.out.println("Read from process: \"" + line + "\"");
-            lines.add(line);
+        while ((line = outReader.readLine()) != null) {
+            System.out.println("Read from process stdout: \"" + line + "\"");
+            outLines.add(line);
         }
-        reader.close();
+        while ((line = errReader.readLine()) != null) {
+            System.err.println("Read from process stderr: \"" + line + "\"");
+            errLines.add(line);
+        }
+        errReader.close();
+        outReader.close();
         int exit = p.waitFor();
         System.out.println("Process exited with " + exit);
         return exit;

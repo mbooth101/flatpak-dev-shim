@@ -57,7 +57,7 @@ static int exec_host_command(const char *workdir, const char *argv[], const char
     GDBusConnection *conn = g_bus_get_sync(G_BUS_TYPE_SESSION, NULL, &error);
     if (error != NULL) {
         g_printerr("Error: %s\n", error->message);
-        return 1;
+        return error->code;
     }
 
     CommandData *command_data = calloc(1, sizeof(CommandData));
@@ -100,7 +100,7 @@ static int exec_host_command(const char *workdir, const char *argv[], const char
         g_dbus_connection_signal_unsubscribe(conn, sub_id);
         g_object_unref(conn);
         free(command_data);
-        return 1;
+        return error->code;
     }
 
     /* The pid of the process running on the sandbox host is returned in the reply */

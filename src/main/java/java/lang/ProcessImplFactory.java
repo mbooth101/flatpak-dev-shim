@@ -9,7 +9,9 @@
  **********************************************************************/
 package java.lang;
 
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Map;
@@ -28,28 +30,74 @@ class ProcessImplFactory {
     static Process start(String[] cmdarray, Map<String, String> environment, String dir,
             ProcessBuilder.Redirect[] redirects, boolean redirectErrStream) throws IOException {
 
-        // If the desired executable program lives in /run/host (where the sandbox host
-        // is mounted) then execute it on the sandbox host, otherwise execute normally
         Path exe = Paths.get(cmdarray[0]);
         if (exe.startsWith(Paths.get("/var/run/host"))) {
+            // If the desired executable program lives in /var/run/host (where the sandbox
+            // host is mounted) then execute it on the sandbox host
             cmdarray[0] = Paths.get("/").resolve(exe.subpath(3, exe.getNameCount())).toString();
-            if (Boolean.getBoolean("flatpak.hostcommandrunner.debug")) {
-                StringBuilder sb = new StringBuilder("Running on sandbox host: ");
-                for (String arg : cmdarray) {
-                    sb.append(" " + arg);
-                }
-                System.err.println(sb.toString());
-            }
-            return FlatpakProcessImpl.start(cmdarray, environment, dir, redirects, redirectErrStream);
+            return runOnHost(cmdarray, environment, dir, redirects, redirectErrStream);
         } else {
-            if (Boolean.getBoolean("flatpak.hostcommandrunner.debug")) {
-                StringBuilder sb = new StringBuilder("Running in sandbox: ");
-                for (String arg : cmdarray) {
-                    sb.append(" " + arg);
+            boolean inSandbox = detectExecutablePresence(true, cmdarray, environment, dir);
+            if (inSandbox) {
+                // If the desired executable program exists in the sandbox, then run normally
+                return runInSandbox(cmdarray, environment, dir, redirects, redirectErrStream);
+            } else {
+                boolean onHost = detectExecutablePresence(false, cmdarray, environment, dir);
+                if (onHost) {
+                    // If the desired executable program does not exist in the sandbox, then execute
+                    // it on the sandbox host
+                    return runOnHost(cmdarray, environment, dir, redirects, redirectErrStream);
+                } else {
+                    throw new IOException("No such file or directory");
                 }
-                System.err.println(sb.toString());
             }
-            return ProcessImpl.start(cmdarray, environment, dir, redirects, redirectErrStream);
         }
+    }
+
+    private static boolean detectExecutablePresence(boolean sandbox, String[] cmdarray, Map<String, String> environment,
+            String dir) throws IOException {
+        String[] whichCommand = new String[] { "which", cmdarray[0] };
+        ProcessBuilder.Redirect[] redirects = new ProcessBuilder.Redirect[] { ProcessBuilder.Redirect.PIPE,
+                ProcessBuilder.Redirect.PIPE, ProcessBuilder.Redirect.PIPE };
+        Process which;
+        if (sandbox) {
+            which = runInSandbox(whichCommand, environment, dir, redirects, false);
+        } else {
+            which = runOnHost(whichCommand, environment, dir, redirects, false);
+        }
+        try {
+            int exit = which.waitFor();
+            if (exit == 0) {
+                return true;
+            } else {
+                return false;
+            }
+        } catch (InterruptedException e) {
+            throw new IOException("Unable to determine location of executable");
+        }
+    }
+
+    private static Process runInSandbox(String[] cmdarray, Map<String, String> environment, String dir,
+            ProcessBuilder.Redirect[] redirects, boolean redirectErrStream) throws IOException {
+        if (Boolean.getBoolean("flatpak.hostcommandrunner.debug")) {
+            StringBuilder sb = new StringBuilder("Running in sandbox:");
+            for (String arg : cmdarray) {
+                sb.append(" " + arg);
+            }
+            System.err.println(sb.toString());
+        }
+        return ProcessImpl.start(cmdarray, environment, dir, redirects, redirectErrStream);
+    }
+
+    private static Process runOnHost(String[] cmdarray, Map<String, String> environment, String dir,
+            ProcessBuilder.Redirect[] redirects, boolean redirectErrStream) throws IOException {
+        if (Boolean.getBoolean("flatpak.hostcommandrunner.debug")) {
+            StringBuilder sb = new StringBuilder("Running on sandbox host:");
+            for (String arg : cmdarray) {
+                sb.append(" " + arg);
+            }
+            System.err.println(sb.toString());
+        }
+        return FlatpakProcessImpl.start(cmdarray, environment, dir, redirects, redirectErrStream);
     }
 }
