@@ -77,6 +77,36 @@ public class ProcessImplTests {
         Assertions.assertLinesMatch(expected, outLines);
     }
 
+    @Test
+    public void avoidDoubleInvokationOfWhichInvalid() throws IOException, InterruptedException {
+        avoidDoubleInvokationOfWhich("no_such_exe", 1, "which: no no_such_exe in");
+    }
+
+    @Test
+    public void avoidDoubleInvokationOfWhichValid() throws IOException, InterruptedException {
+        avoidDoubleInvokationOfWhich("test", 0, "/usr/bin/test");
+    }
+
+    private void avoidDoubleInvokationOfWhich(String exe, int retcode, String message)
+            throws IOException, InterruptedException {
+        int rc1 = readThenWait(true, "which", exe);
+        Assertions.assertEquals(retcode, rc1);
+        Assertions.assertTrue(outLines.get(0).contains(message));
+        outLines.clear();
+        int rc2 = readThenWait(true, "/usr/bin/which", exe);
+        Assertions.assertEquals(retcode, rc2);
+        Assertions.assertTrue(outLines.get(0).contains(message));
+        outLines.clear();
+        int rc3 = readThenWait(true, "/usr/bin/sh", "-c", "-l", "which " + exe);
+        Assertions.assertEquals(retcode, rc3);
+        Assertions.assertTrue(outLines.get(0).contains(message));
+        outLines.clear();
+        int rc4 = readThenWait(true, "/usr/bin/sh", "-c", "-l", "/usr/bin/which " + exe);
+        Assertions.assertEquals(retcode, rc4);
+        Assertions.assertTrue(outLines.get(0).contains(message));
+        outLines.clear();
+    }
+
     private int readThenWait(boolean redirectErr, String... args) throws IOException, InterruptedException {
         ProcessBuilder pb = new ProcessBuilder(args);
         pb.redirectErrorStream(redirectErr);
@@ -96,6 +126,7 @@ public class ProcessImplTests {
         outReader.close();
         int exit = p.waitFor();
         System.out.println("Process exited with " + exit);
+        System.out.println();
         return exit;
     }
 }

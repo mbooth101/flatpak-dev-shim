@@ -37,15 +37,53 @@ class ProcessImplFactory {
             cmdarray[0] = Paths.get("/").resolve(exe.subpath(3, exe.getNameCount())).toString();
             return runOnHost(cmdarray, environment, dir, redirects, redirectErrStream);
         } else {
-            boolean inSandbox = detectExecutablePresence(true, cmdarray, environment, dir);
+            // Sometimes clients try to be clever and attempt to determine whether a command
+            // exists and discover its full path before executing by using the "which"
+            // utility. However, we also use which to determine whether a command exists in
+            // the sandbox or on the sandbox host, which can lead us to do a pointless
+            // invokation of "which which". In this case we want to test for the command
+            // that the client is attempting to test for, and then execute which for the
+            // client in the right context. In general, which is invoked by clients in two
+            // ways:
+
+            // 1) Invoking "which" directly, the command we really want to test for is the
+            // next argument
+            String testexe = cmdarray[0];
+            boolean which = false;
+            if (exe.endsWith(Paths.get("which"))) {
+                testexe = cmdarray[1];
+                which = true;
+            }
+
+            // 2) Invoking "which" through a shell, the command we really want to test for
+            // is the second word of the final argument when "-c" is passed to the shell
+            if (exe.endsWith(Paths.get("sh")) || exe.endsWith(Paths.get("bash")) || exe.endsWith(Paths.get("dash"))) {
+                boolean executingShellCommand = false;
+                for (String s : cmdarray) {
+                    if (s.equals("-c")) {
+                        executingShellCommand = true;
+                        break;
+                    }
+                }
+                if (executingShellCommand) {
+                    String shellCommand = cmdarray[cmdarray.length - 1];
+                    String[] shellCommandParts = shellCommand.split("\\s");
+                    if (shellCommandParts.length > 1 && Paths.get(shellCommandParts[0]).endsWith("which")) {
+                        testexe = shellCommandParts[1];
+                        which = true;
+                    }
+                }
+            }
+
+            // If the desired executable program exists in the sandbox, then run normally
+            boolean inSandbox = detectExecutablePresence(true, testexe, environment, dir);
             if (inSandbox) {
-                // If the desired executable program exists in the sandbox, then run normally
                 return runInSandbox(cmdarray, environment, dir, redirects, redirectErrStream);
             } else {
-                boolean onHost = detectExecutablePresence(false, cmdarray, environment, dir);
-                if (onHost) {
-                    // If the desired executable program does not exist in the sandbox, then execute
-                    // it on the sandbox host
+                // If the desired executable program does not exist in the sandbox, then execute
+                // it on the sandbox host
+                boolean onHost = detectExecutablePresence(false, testexe, environment, dir);
+                if (onHost || which) {
                     return runOnHost(cmdarray, environment, dir, redirects, redirectErrStream);
                 } else {
                     throw new IOException("No such file or directory");
@@ -54,12 +92,15 @@ class ProcessImplFactory {
         }
     }
 
-    private static boolean detectExecutablePresence(boolean sandbox, String[] cmdarray, Map<String, String> environment,
+    private static boolean detectExecutablePresence(boolean sandbox, String exe, Map<String, String> environment,
             String dir) throws IOException {
-        String[] whichCommand = new String[] { "which", cmdarray[0] };
+        String[] whichCommand = new String[] { "sh", "-c", "-l", "which " + exe };
         ProcessBuilder.Redirect[] redirects = new ProcessBuilder.Redirect[] { ProcessBuilder.Redirect.PIPE,
                 ProcessBuilder.Redirect.PIPE, ProcessBuilder.Redirect.PIPE };
         Process which;
+        if (Boolean.getBoolean("flatpak.hostcommandrunner.debug")) {
+            System.err.println("Checking for presence of '" + exe + (sandbox ? "' in sandbox" : "' on sandbox host"));
+        }
         if (sandbox) {
             which = runInSandbox(whichCommand, environment, dir, redirects, false);
         } else {
