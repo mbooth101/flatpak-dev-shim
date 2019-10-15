@@ -10,10 +10,13 @@
 package uk.co.matbooth.flatpak;
 
 import java.io.BufferedReader;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -78,6 +81,29 @@ public class ProcessImplTests {
     }
 
     @Test
+    public void passEnvVariable() throws IOException, InterruptedException {
+        Map<String, String> env = new HashMap<>();
+        env.put("BEANS", "cheese");
+
+        readThenWait(true, null, env, "/var/run/host/usr/bin/env");
+        boolean found = false;
+        for (String line : outLines) {
+            if (line.equals("BEANS=cheese")) {
+                found = true;
+            }
+        }
+        Assertions.assertTrue(found);
+    }
+
+    @Test
+    public void changeWorkingDir() throws IOException, InterruptedException {
+        readThenWait(true, new File("/tmp"), null, "/var/run/host/usr/bin/sh", "-c", "pwd");
+        List<String> expected = new ArrayList<>();
+        expected.add("/tmp");
+        Assertions.assertLinesMatch(expected, outLines);
+    }
+
+    @Test
     public void avoidDoubleInvokationOfWhichInvalid() throws IOException, InterruptedException {
         avoidDoubleInvokationOfWhich("no_such_exe", 1, "which: no no_such_exe in");
     }
@@ -108,8 +134,22 @@ public class ProcessImplTests {
     }
 
     private int readThenWait(boolean redirectErr, String... args) throws IOException, InterruptedException {
+        return readThenWait(redirectErr, null, null, args);
+    }
+
+    private int readThenWait(boolean redirectErr, File working, Map<String, String> env, String... args)
+            throws IOException, InterruptedException {
         ProcessBuilder pb = new ProcessBuilder(args);
         pb.redirectErrorStream(redirectErr);
+        if (env != null && !env.isEmpty()) {
+            Map<String, String> environment = pb.environment();
+            for (String key : env.keySet()) {
+                environment.put(key, env.get(key));
+            }
+        }
+        if (working != null) {
+            pb.directory(working);
+        }
         Process p = pb.start();
         BufferedReader outReader = new BufferedReader(new InputStreamReader(p.getInputStream()));
         BufferedReader errReader = new BufferedReader(new InputStreamReader(p.getErrorStream()));

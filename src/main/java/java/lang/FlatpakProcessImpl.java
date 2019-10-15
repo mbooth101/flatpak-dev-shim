@@ -113,8 +113,10 @@ final class FlatpakProcessImpl extends Process {
         // executable that will launch the process on the process host and working
         // directory that should be used on the sandbox host
         List<String> argarray = new ArrayList<>();
-        argarray.add("hostcommandrunner");
-        argarray.add(workdir);
+        argarray.add("flatpak-spawn");
+        argarray.add("--host");
+        // TODO Add working dir support to flatpak-spawn
+        // argarray.add(workdir);
         argarray.addAll(Arrays.asList(cmdarray));
         byte[] argv = toCStrings(argarray.toArray(new String[0]));
 
