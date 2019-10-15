@@ -7,9 +7,8 @@ CC=gcc
 OUT_DIR=../target
 
 GENERATED_HEADERS=java_lang_FlatpakProcessImpl.h
-OBJECTS=FlatpakProcessImpl.o HostCommandRunner.o
+OBJECTS=FlatpakProcessImpl.o
 LIBRARY=$(OUT_DIR)/libflatpakdevshim.so
-PROGRAM=$(OUT_DIR)/hostcommandrunner
 
 CFLAGS += -fPIC -D_REENTRANT -I$(JAVA_HOME)/include -I$(JAVA_HOME)/include/linux $(shell pkg-config --cflags glib-2.0 gio-unix-2.0)
 LDFLAGS += $(shell pkg-config --libs glib-2.0 gio-unix-2.0)
@@ -23,10 +22,7 @@ $(OBJECTS): %.o : %.c $(GENERATED_HEADERS)
 $(LIBRARY) : FlatpakProcessImpl.o
 	$(CC) $(LDFLAGS) -shared -o $@ $^
 
-$(PROGRAM) : HostCommandRunner.o
-	$(CC) $(LDFLAGS) -o $@ $^
-
-all: $(LIBRARY) $(PROGRAM)
+all: $(LIBRARY)
 
 clean:
 	$(RM) $(OBJECTS) $(GENERATED_HEADERS)

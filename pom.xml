@@ -105,11 +105,11 @@
         </plugin>
         <plugin>
           <artifactId>maven-jar-plugin</artifactId>
-          <version>3.1.0</version>
+          <version>3.1.2</version>
         </plugin>
         <plugin>
           <artifactId>maven-source-plugin</artifactId>
-          <version>3.0.1</version>
+          <version>3.1.0</version>
         </plugin>
         <plugin>
           <artifactId>maven-install-plugin</artifactId>
@@ -136,9 +136,6 @@
               argument line and not later -->
             <argLine>--patch-module=java.base=${project.build.outputDirectory}
               -Dsun.boot.library.path=${sun.boot.library.path}:${project.build.directory}</argLine>
-            <environmentVariables>
-              <PATH>${env.PATH}:${project.build.directory}</PATH>
-            </environmentVariables>
             <systemPropertyVariables>
               <flatpak.hostcommandrunner.debug>true</flatpak.hostcommandrunner.debug>
             </systemPropertyVariables>
@@ -198,10 +195,6 @@
                 <artifact>
                   <file>${project.build.directory}/libflatpakdevshim.so</file>
                   <type>so</type>
-                </artifact>
-                <artifact>
-                  <file>${project.build.directory}/hostcommandrunner</file>
-                  <type>exe</type>
                 </artifact>
               </artifacts>
             </configuration>
