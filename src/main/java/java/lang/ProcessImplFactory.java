@@ -123,7 +123,7 @@ class ProcessImplFactory {
         if (Boolean.getBoolean("flatpak.hostcommandrunner.debug")) {
             StringBuilder sb = new StringBuilder("Running in sandbox:");
             for (String arg : cmdarray) {
-                sb.append(" '" + arg + "'");
+                sb.append(" " + arg);
             }
             System.err.println(sb.toString());
         }
@@ -135,7 +135,7 @@ class ProcessImplFactory {
         if (Boolean.getBoolean("flatpak.hostcommandrunner.debug")) {
             StringBuilder sb = new StringBuilder("Running on sandbox host:");
             for (String arg : cmdarray) {
-                sb.append(" '" + arg + "'");
+                sb.append(" " + arg);
             }
             System.err.println(sb.toString());
         }
