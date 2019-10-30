@@ -27,11 +27,6 @@ To use system-specific compiler and linker flags when building the native parts,
 
 * Because the spawned process runs outside the sandbox, it is not visible to Java (it is outside of the sandbox's cgroup). This means we can't enumerate the process's children and traverse the process hierarchy, etc.
 
-## To Do
-
-* Killing processes on command
-* Killing processes on exit
-
 ## Problems
 
 Some problems encountered during development:
