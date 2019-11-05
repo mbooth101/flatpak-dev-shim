@@ -44,7 +44,7 @@ public class ProcessImplTests {
     }
 
     @Test
-    public void runOnHostDueToNotFoundInSandbox() throws IOException, InterruptedException {
+    public void runOnHostDueToNotFoundInSandbox() throws InterruptedException {
         try {
             readThenWait(false, "no_such_exe");
             Assertions.fail("An IOException was expected");
@@ -151,19 +151,18 @@ public class ProcessImplTests {
             pb.directory(working);
         }
         Process p = pb.start();
-        BufferedReader outReader = new BufferedReader(new InputStreamReader(p.getInputStream()));
-        BufferedReader errReader = new BufferedReader(new InputStreamReader(p.getErrorStream()));
-        String line = null;
-        while ((line = outReader.readLine()) != null) {
-            System.out.println("Read from process stdout: \"" + line + "\"");
-            outLines.add(line);
+        try (BufferedReader outReader = new BufferedReader(new InputStreamReader(p.getInputStream()));
+                BufferedReader errReader = new BufferedReader(new InputStreamReader(p.getErrorStream()))) {
+            String line = null;
+            while ((line = outReader.readLine()) != null) {
+                System.out.println("Read from process stdout: \"" + line + "\"");
+                outLines.add(line);
+            }
+            while ((line = errReader.readLine()) != null) {
+                System.err.println("Read from process stderr: \"" + line + "\"");
+                errLines.add(line);
+            }
         }
-        while ((line = errReader.readLine()) != null) {
-            System.err.println("Read from process stderr: \"" + line + "\"");
-            errLines.add(line);
-        }
-        errReader.close();
-        outReader.close();
         int exit = p.waitFor();
         System.out.println("Process exited with " + exit);
         System.out.println();

@@ -34,60 +34,48 @@ class ProcessImplFactory {
             // host is mounted) then execute it on the sandbox host
             cmdarray[0] = Paths.get("/").resolve(exe.subpath(3, exe.getNameCount())).toString();
             return runOnHost(cmdarray, environment, dir, redirects, redirectErrStream);
-        } else {
-            // Sometimes clients try to be clever and attempt to determine whether a command
-            // exists and discover its full path before executing by using the "which"
-            // utility. However, we also use which to determine whether a command exists in
-            // the sandbox or on the sandbox host, which can lead us to do a pointless
-            // invokation of "which which". In this case we want to test for the command
-            // that the client is attempting to test for, and then execute which for the
-            // client in the right context. In general, which is invoked by clients in two
-            // ways:
+        }
+        // 1) Invoking "which" directly, the command we really want to test for is the
+        // next argument
+        String testexe = cmdarray[0];
+        boolean which = false;
+        if (exe.endsWith(Paths.get("which"))) {
+            testexe = cmdarray[1];
+            which = true;
+        }
 
-            // 1) Invoking "which" directly, the command we really want to test for is the
-            // next argument
-            String testexe = cmdarray[0];
-            boolean which = false;
-            if (exe.endsWith(Paths.get("which"))) {
-                testexe = cmdarray[1];
-                which = true;
-            }
-
-            // 2) Invoking "which" through a shell, the command we really want to test for
-            // is the second word of the final argument when "-c" is passed to the shell
-            if (exe.endsWith(Paths.get("sh")) || exe.endsWith(Paths.get("bash")) || exe.endsWith(Paths.get("dash"))) {
-                boolean executingShellCommand = false;
-                for (String s : cmdarray) {
-                    if (s.equals("-c")) {
-                        executingShellCommand = true;
-                        break;
-                    }
-                }
-                if (executingShellCommand) {
-                    String shellCommand = cmdarray[cmdarray.length - 1];
-                    String[] shellCommandParts = shellCommand.split("\\s");
-                    if (shellCommandParts.length > 1 && Paths.get(shellCommandParts[0]).endsWith("which")) {
-                        testexe = shellCommandParts[1];
-                        which = true;
-                    }
+        // 2) Invoking "which" through a shell, the command we really want to test for
+        // is the second word of the final argument when "-c" is passed to the shell
+        if (exe.endsWith(Paths.get("sh")) || exe.endsWith(Paths.get("bash")) || exe.endsWith(Paths.get("dash"))) {
+            boolean executingShellCommand = false;
+            for (String s : cmdarray) {
+                if (s.equals("-c")) {
+                    executingShellCommand = true;
+                    break;
                 }
             }
-
-            // If the desired executable program exists in the sandbox, then run normally
-            boolean inSandbox = detectExecutablePresence(true, testexe, environment, dir);
-            if (inSandbox) {
-                return runInSandbox(cmdarray, environment, dir, redirects, redirectErrStream);
-            } else {
-                // If the desired executable program does not exist in the sandbox, then execute
-                // it on the sandbox host
-                boolean onHost = detectExecutablePresence(false, testexe, environment, dir);
-                if (onHost || which) {
-                    return runOnHost(cmdarray, environment, dir, redirects, redirectErrStream);
-                } else {
-                    throw new IOException("No such file or directory");
+            if (executingShellCommand) {
+                String shellCommand = cmdarray[cmdarray.length - 1];
+                String[] shellCommandParts = shellCommand.split("\\s");
+                if (shellCommandParts.length > 1 && Paths.get(shellCommandParts[0]).endsWith("which")) {
+                    testexe = shellCommandParts[1];
+                    which = true;
                 }
             }
         }
+
+        // If the desired executable program exists in the sandbox, then run normally
+        boolean inSandbox = detectExecutablePresence(true, testexe, environment, dir);
+        if (inSandbox) {
+            return runInSandbox(cmdarray, environment, dir, redirects, redirectErrStream);
+        }
+        // If the desired executable program does not exist in the sandbox, then execute
+        // it on the sandbox host
+        boolean onHost = detectExecutablePresence(false, testexe, environment, dir);
+        if (onHost || which) {
+            return runOnHost(cmdarray, environment, dir, redirects, redirectErrStream);
+        }
+        throw new IOException("No such file or directory");
     }
 
     private static boolean detectExecutablePresence(boolean sandbox, String exe, Map<String, String> environment,
@@ -108,9 +96,8 @@ class ProcessImplFactory {
             int exit = which.waitFor();
             if (exit == 0) {
                 return true;
-            } else {
-                return false;
             }
+            return false;
         } catch (InterruptedException e) {
             throw new IOException("Unable to determine location of executable");
         }

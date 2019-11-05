@@ -372,7 +372,7 @@ public final class ProcessBuilder
                 // for compatibility with old broken code.
 
                 // Silently discard any trailing junk.
-                if (envstring.indexOf((int) '\u0000') != -1)
+                if (envstring.indexOf('\u0000') != -1)
                     envstring = envstring.replaceFirst("\u0000.*", "");
 
                 int eqlsign =
@@ -428,7 +428,9 @@ public final class ProcessBuilder
     static class NullInputStream extends InputStream {
         static final NullInputStream INSTANCE = new NullInputStream();
         private NullInputStream() {}
+        @Override
         public int read()      { return -1; }
+        @Override
         public int available() { return 0; }
     }
 
@@ -438,6 +440,7 @@ public final class ProcessBuilder
     static class NullOutputStream extends OutputStream {
         static final NullOutputStream INSTANCE = new NullOutputStream();
         private NullOutputStream() {}
+        @Override
         public void write(int b) throws IOException {
             throw new IOException("Stream closed");
         }
@@ -503,7 +506,7 @@ public final class ProcessBuilder
              * {@link Redirect#appendTo Redirect.appendTo(File)}.
              */
             APPEND
-        };
+        }
 
         /**
          * Returns the type of this {@code Redirect}.
@@ -524,7 +527,9 @@ public final class ProcessBuilder
          * }</pre>
          */
         public static final Redirect PIPE = new Redirect() {
+                @Override
                 public Type type() { return Type.PIPE; }
+                @Override
                 public String toString() { return type().toString(); }};
 
         /**
@@ -539,7 +544,9 @@ public final class ProcessBuilder
          * }</pre>
          */
         public static final Redirect INHERIT = new Redirect() {
+                @Override
                 public Type type() { return Type.INHERIT; }
+                @Override
                 public String toString() { return type().toString(); }};
 
 
@@ -557,9 +564,13 @@ public final class ProcessBuilder
          * @since 9
          */
         public static final Redirect DISCARD = new Redirect() {
+                @Override
                 public Type type() { return Type.WRITE; }
+                @Override
                 public String toString() { return type().toString(); }
+                @Override
                 public File file() { return NULL_FILE; }
+                @Override
                 boolean append() { return false; }
         };
 
@@ -596,8 +607,11 @@ public final class ProcessBuilder
             if (file == null)
                 throw new NullPointerException();
             return new Redirect() {
+                    @Override
                     public Type type() { return Type.READ; }
+                    @Override
                     public File file() { return file; }
+                    @Override
                     public String toString() {
                         return "redirect to read from file \"" + file + "\"";
                     }
@@ -622,11 +636,15 @@ public final class ProcessBuilder
             if (file == null)
                 throw new NullPointerException();
             return new Redirect() {
+                    @Override
                     public Type type() { return Type.WRITE; }
+                    @Override
                     public File file() { return file; }
+                    @Override
                     public String toString() {
                         return "redirect to write to file \"" + file + "\"";
                     }
+                    @Override
                     boolean append() { return false; }
                 };
         }
@@ -652,11 +670,15 @@ public final class ProcessBuilder
             if (file == null)
                 throw new NullPointerException();
             return new Redirect() {
+                    @Override
                     public Type type() { return Type.APPEND; }
+                    @Override
                     public File file() { return file; }
+                    @Override
                     public String toString() {
                         return "redirect to append to file \"" + file + "\"";
                     }
+                    @Override
                     boolean append() { return true; }
                 };
         }
@@ -668,6 +690,7 @@ public final class ProcessBuilder
          * instances of the same type associated with non-null equal
          * {@code File} instances.
          */
+        @Override
         public boolean equals(Object obj) {
             if (obj == this)
                 return true;
@@ -684,12 +707,12 @@ public final class ProcessBuilder
          * Returns a hash code value for this {@code Redirect}.
          * @return a hash code value for this {@code Redirect}
          */
+        @Override
         public int hashCode() {
             File file = file();
             if (file == null)
                 return super.hashCode();
-            else
-                return file.hashCode();
+            return file.hashCode();
         }
 
         /**

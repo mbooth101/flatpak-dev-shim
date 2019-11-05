@@ -100,6 +100,7 @@ final class FlatpakProcessImpl extends Process {
     /**
      * For use only by {@link ProcessBuilder#start()}.
      */
+    @SuppressWarnings("resource")
     static Process start(String[] cmdarray, Map<String, String> environment, String dir,
             ProcessBuilder.Redirect[] redirects, boolean redirectErrStream) throws IOException {
 
