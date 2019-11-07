@@ -300,7 +300,7 @@ final class FlatpakProcessImpl extends Process {
     private static byte[] toCStrings(String... values) {
         int size = 0;
         for (String value : values) {
-            size += value.length() + 1;
+            size += value.getBytes().length + 1;
         }
         byte[] result = new byte[size];
         int pos = 0;
