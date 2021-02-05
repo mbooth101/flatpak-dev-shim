@@ -1,4 +1,11 @@
-# Flatpak Development Shim
+# THIS REPO IS DEPRECATED
+
+The shim is now being developed at the Eclipse Foundation:
+
+https://git.eclipse.org/c/linuxtools/org.eclipse.linuxtools.eclipse-build.git
+
+
+## Flatpak Development Shim
 
 A shim that allows Java programs to breakout of a Flatpak sandbox and spawn processes on the sandbox host. It is built as a Jigsaw-style module patch to override Java's `java.lang.ProcessBuilder` functionality and spawns processes on the sandbox host by communicating with the "Development" interface of the org.freedesktop.Flatpak DBus API.
 
